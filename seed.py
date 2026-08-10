@@ -26,6 +26,7 @@ from faker import Faker
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import hash_password
 from app.db.models.audit_log import AuditLog
 from app.db.models.commit import Commit
 from app.db.models.repo import Repo
@@ -103,8 +104,13 @@ AUDIT_ACTIONS = [
 
 
 def _password_hash() -> str:
-    """Generate a fake password hash."""
-    return hashlib.sha256(fake.password().encode()).hexdigest()
+    """Generate a bcrypt password hash for seeded users.
+
+    Uses a known password ("password123") so that any seeded Faker
+    user can log in during development.  The hash is a proper bcrypt
+    hash compatible with ``app.core.security.verify_password``.
+    """
+    return hash_password("password123")
 
 
 def _generate_sha(seed_str: str) -> str:
@@ -401,6 +407,47 @@ async def seed_audit_logs(
 # ---------------------------------------------------------------------------
 
 
+async def seed_demo_user(
+    session: AsyncSession,
+    teams: list[Team],
+) -> None:
+    """Create a deterministic demo user for frontend development.
+
+    Credentials match the hint shown on the login page:
+        demo@smartdashboard.dev / demo-password-123
+    """
+    from sqlalchemy import select as _select
+
+    existing = await session.execute(
+        _select(User).where(User.email == "demo@smartdashboard.dev")
+    )
+    if existing.scalar_one_or_none() is not None:
+        print("  Demo user already exists, skipping.")
+        return
+
+    demo_team = teams[0]
+    user = User(
+        id=uuid4(),
+        email="demo@smartdashboard.dev",
+        name="Demo User",
+        password_hash=hash_password("demo-password-123"),
+        avatar_url="https://api.dicebear.com/7.x/identicon/png?seed=demo",
+        github_username="demo-user",
+    )
+    session.add(user)
+    await session.flush()
+
+    tm = TeamMember(
+        id=uuid4(),
+        team_id=demo_team.id,
+        user_id=user.id,
+        role="admin",
+        joined_at=datetime.now(UTC),
+    )
+    session.add(tm)
+    print("  Created demo user: demo@smartdashboard.dev (demo-password-123)")
+
+
 async def main() -> None:
     """Run the seed script."""
     print("Seeding database with Faker-generated data...")
@@ -408,25 +455,28 @@ async def main() -> None:
 
     async with AsyncSessionLocal() as session:
         async with session.begin():
-            print("\n[1/7] Clearing existing data...")
+            print("\n[1/8] Clearing existing data...")
             await clear_existing_data(session)
 
-            print("\n[2/7] Seeding teams...")
+            print("\n[2/8] Seeding teams...")
             teams = await seed_teams(session)
 
-            print("\n[3/7] Seeding users and memberships...")
+            print("\n[3/8] Seeding users and memberships...")
             all_users, memberships = await seed_users_and_members(session, teams)
 
-            print("\n[4/7] Seeding repos...")
+            print("\n[4/8] Seeding demo user...")
+            await seed_demo_user(session, teams)
+
+            print("\n[5/8] Seeding repos...")
             repos_by_team = await seed_repos(session, teams)
 
-            print("\n[5/7] Seeding repo memberships...")
+            print("\n[6/8] Seeding repo memberships...")
             await seed_repo_members(session, memberships, repos_by_team)
 
-            print("\n[6/7] Seeding commits...")
+            print("\n[7/8] Seeding commits...")
             commit_count = await seed_commits(session, memberships, repos_by_team)
 
-            print("\n[7/7] Seeding audit logs...")
+            print("\n[8/8] Seeding audit logs...")
             log_count = await seed_audit_logs(session, teams, memberships)
 
     print("\n" + "=" * 60)

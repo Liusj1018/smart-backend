@@ -8,8 +8,12 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.dependencies.auth import CurrentUser, get_current_user
 from app.schemas.auth import (
     LoginRequest,
+    LogoutRequest,
+    LogoutResponse,
+    MeResponse,
     RefreshRequest,
     RegisterRequest,
     RegisterResponse,
@@ -76,3 +80,39 @@ async def refresh(
     - Expired refresh token returns 401 with "请重新登录".
     """
     return await auth_service.refresh_token(db, payload)
+
+
+@router.get(
+    "/me",
+    response_model=MeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="获取当前用户信息",
+)
+async def get_me(
+    current: Annotated[CurrentUser, Depends(get_current_user)],
+) -> MeResponse:
+    """Return the profile of the currently authenticated user.
+
+    - Requires a valid Bearer access token.
+    - Returns id, email, name, team_id, and role.
+    """
+    return await auth_service.get_me(current)
+
+
+@router.post(
+    "/logout",
+    response_model=LogoutResponse,
+    status_code=status.HTTP_200_OK,
+    summary="用户登出",
+)
+async def logout(
+    payload: LogoutRequest | None = None,
+) -> LogoutResponse:
+    """Log out the current user.
+
+    - If a refresh token is provided in the body, it is blacklisted.
+    - The client should discard the access token (it expires in 15 min).
+    - This endpoint is idempotent — it always succeeds.
+    """
+    body = payload or LogoutRequest()
+    return await auth_service.logout(body)

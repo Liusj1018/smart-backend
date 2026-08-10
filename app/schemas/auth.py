@@ -121,3 +121,32 @@ class RefreshRequest(BaseModel):
         str,
         Field(min_length=1, description="A valid refresh token"),
     ]
+
+
+class MeResponse(BaseModel):
+    """Response containing the current authenticated user's information."""
+
+    id: Annotated[str, Field(description="User UUID")]
+    email: Annotated[str, Field(description="User email")]
+    name: Annotated[str, Field(description="Display name")]
+    team_id: Annotated[str, Field(description="Current team UUID")]
+    role: Annotated[str, Field(description="User role within the team")]
+
+
+class LogoutRequest(BaseModel):
+    """Optional request body for logout.
+
+    The refresh token is optional — when provided, it is blacklisted
+    immediately so it cannot be reused.
+    """
+
+    refresh_token: Annotated[
+        str | None,
+        Field(default=None, description="Refresh token to revoke"),
+    ] = None
+
+
+class LogoutResponse(BaseModel):
+    """Response after successful logout."""
+
+    message: Annotated[str, Field(default="退出成功")]

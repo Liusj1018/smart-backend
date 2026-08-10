@@ -20,6 +20,9 @@ from app.exceptions import ConflictError, NotFoundError, UnauthorizedError
 from app.middleware.token_blacklist import token_blacklist
 from app.schemas.auth import (
     LoginRequest,
+    LogoutRequest,
+    LogoutResponse,
+    MeResponse,
     RefreshRequest,
     RegisterRequest,
     RegisterResponse,
@@ -202,3 +205,45 @@ async def refresh_token(db: AsyncSession, body: RefreshRequest) -> TokenResponse
         token_type="bearer",
         expires_in=settings.access_token_expire_minutes * 60,
     )
+
+
+async def get_me(current_user) -> MeResponse:
+    """Return the current authenticated user's profile.
+
+    The user identity and tenant context come from the verified JWT
+    via the ``get_current_user`` dependency — no database query needed
+    because the user row was already loaded during authentication.
+    """
+    return MeResponse(
+        id=str(current_user.user.id),
+        email=current_user.user.email,
+        name=current_user.user.name,
+        team_id=current_user.team_id,
+        role=current_user.role,
+    )
+
+
+async def logout(body: LogoutRequest) -> LogoutResponse:
+    """Log the user out by revoking the refresh token.
+
+    If a refresh token is provided in the request body, it is decoded
+    and its ``jti`` is added to the blacklist so it cannot be reused.
+    Invalid or expired tokens are silently ignored — logout is
+    idempotent and always succeeds.
+
+    Note: Access tokens are stateless JWTs and cannot be revoked
+    before their natural expiry (15 minutes).  The client must
+    discard them.
+    """
+    if body.refresh_token:
+        try:
+            payload = decode_token(body.refresh_token)
+            jti = payload.get("jti")
+            family_id = payload.get("fam")
+            if jti and family_id:
+                token_blacklist.revoke(jti, family_id)
+        except jwt.InvalidTokenError:
+            # Token is already invalid/expired — nothing to revoke
+            pass
+
+    return LogoutResponse(message="退出成功")
