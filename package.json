@@ -1,0 +1,14 @@
+{
+  "name": "smart-commit-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript type generation from FastAPI OpenAPI schema",
+  "scripts": {
+    "openapi:export": "python scripts/export_openapi.py",
+    "gen:types": "npm run openapi:export && npx openapi-typescript openapi.json -o frontend-types/api.d.ts",
+    "types:check": "npx openapi-typescript openapi.json -o frontend-types/api.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.0"
+  }
+}

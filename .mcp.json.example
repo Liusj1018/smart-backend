@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-postgres",
+        "--dsn",
+        "postgresql://sch_ro:CHANGE_ME@localhost:5432/smart_commit"
+      ]
+    }
+  }
+}

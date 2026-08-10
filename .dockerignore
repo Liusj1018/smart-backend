@@ -1,0 +1,76 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose*.yml
+
+# Documentation
+*.md
+docs/
+README*
+
+# Tooling configs
+.mcp.json
+.mcp.json.example
+.claude/
+bruno/
+
+# Scripts (not needed in runtime image)
+scripts/
+
+# Alembic config (migrations run separately if needed)
+# Keep alembic.ini and alembic/ for migration support in container
+# Uncomment below if you don't need migrations in the image:
+# alembic.ini
+# alembic/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp

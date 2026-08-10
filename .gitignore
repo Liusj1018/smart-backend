@@ -1,0 +1,36 @@
+# Environment
+.env
+.mcp.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code local settings (personal overrides, not shared)
+.claude/settings.local.json
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node (for openapi-typescript)
+node_modules/
+
+# OS
+Thumbs.db
+.DS_Store

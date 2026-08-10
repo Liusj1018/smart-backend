@@ -1,0 +1,100 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: smartcommit-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-037875}
+      POSTGRES_DB: ${POSTGRES_DB:-smart_commit}
+    # NOTE: No host port binding by default to avoid conflicts with a local
+    # PostgreSQL. The api service reaches the db over the internal Docker
+    # network via hostname "db". Set DB_PORT to publish (e.g. 5433:5432).
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-smart_commit}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - smartcommit-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartcommit-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - smartcommit-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartcommit-api
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      # Override DATABASE_URL to point to the db container on the Docker network
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-037875}@db:5432/${POSTGRES_DB:-smart_commit}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production-9f8e7d6c5b4a}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks:
+      - smartcommit-net
+
+  cv:
+    build:
+      context: ./cv-service
+      dockerfile: Dockerfile
+    container_name: smartcommit-cv
+    restart: unless-stopped
+    ports:
+      - "${CV_PORT:-8001}:8001"
+    environment:
+      MODEL_PATH: /app/model.onnx
+      INPUT_SHAPE: ${CV_INPUT_SHAPE:-1,4}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - smartcommit-net
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  smartcommit-net:
+    driver: bridge
