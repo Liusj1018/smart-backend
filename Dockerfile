@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir --no-compile -i https://pypi.tuna.tsinghua.edu.cn
     "pydantic>=2.9.0" \
     "pydantic-settings>=2.4.0" \
     "sqlalchemy[asyncio]>=2.0.0" \
+    "asyncpg>=0.29.0" \
     "psycopg[binary]>=3.2.0" \
     "email-validator>=2.0.0" \
     "alembic>=1.13.0" \
