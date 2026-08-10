@@ -50,7 +50,7 @@ services:
       - "${APP_PORT:-8000}:8000"
     environment:
       # Override DATABASE_URL to point to the db container on the Docker network
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-037875}@db:5432/${POSTGRES_DB:-smart_commit}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-037875}@db:5432/${POSTGRES_DB:-smart_commit}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production-9f8e7d6c5b4a}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
