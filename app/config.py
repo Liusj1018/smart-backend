@@ -27,7 +27,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:password@localhost:5432/smart_commit"
 
     # CORS whitelist — comma-separated in env, NEVER use "*" in production
-    cors_origins: str = "http://localhost:3000,http://localhost:5173"
+    cors_origins: str = (
+        "http://localhost:3000,http://localhost:5173,"
+        "https://smart-commit-helper-2-0.vercel.app"
+    )
 
     # JWT configuration
     jwt_secret: str = "change-me-in-production"
