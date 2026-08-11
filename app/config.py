@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # CORS whitelist — comma-separated in env, NEVER use "*" in production
     cors_origins: str = (
-        "http://localhost:3000,http://localhost:5173,"
+        "http://localhost:3000,http://localhost:3001,http://localhost:5173,"
         "https://smart-commit-helper-2-0.vercel.app"
     )
 
