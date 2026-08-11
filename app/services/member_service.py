@@ -13,6 +13,7 @@ from app.db.models.team_member import TeamMember
 from app.db.models.user import User
 from app.exceptions import (
     ConflictError,
+    ForbiddenError,
     NotFoundError,
 )
 from app.models.member import Member, Role
@@ -125,6 +126,16 @@ async def create_member(
     return _to_member(tm)
 
 
+async def _count_admins(db: AsyncSession, team_id: UUID) -> int:
+    """Return the number of admin members in a team."""
+    count_q = (
+        select(func.count())
+        .select_from(TeamMember)
+        .where(TeamMember.team_id == team_id, TeamMember.role == "admin")
+    )
+    return (await db.execute(count_q)).scalar_one()
+
+
 async def update_member(
     db: AsyncSession,
     team_id: str,
@@ -150,6 +161,12 @@ async def update_member(
     if tm is None:
         raise NotFoundError("成员不存在")
 
+    # Prevent demoting the last admin
+    if role is not None and role.value != "admin" and tm.role == "admin":
+        admin_count = await _count_admins(db, tid)
+        if admin_count <= 1:
+            raise ConflictError("团队必须至少保留一名管理员")
+
     if role is not None:
         tm.role = role.value
     if name is not None:
@@ -164,15 +181,47 @@ async def update_member(
     return _to_member(tm)
 
 
-async def delete_member(db: AsyncSession, team_id: str, member_id: str) -> None:
-    """Delete a member."""
+async def delete_member(
+    db: AsyncSession,
+    team_id: str,
+    member_id: str,
+    current_user_id: str | None = None,
+) -> None:
+    """Delete a member.
+
+    Args:
+        db: Database session.
+        team_id: The tenant UUID.
+        member_id: The TeamMember UUID to delete.
+        current_user_id: The User UUID of the caller — used to prevent
+            self-deletion.
+    """
     try:
         tid = UUID(team_id)
         mid = UUID(member_id)
     except ValueError as exc:
         raise NotFoundError("成员不存在") from exc
+
+    # Fetch the member first to check role and user_id
     result = await db.execute(
+        select(TeamMember)
+        .where(TeamMember.id == mid, TeamMember.team_id == tid)
+        .options(selectinload(TeamMember.user))
+    )
+    tm = result.scalar_one_or_none()
+    if tm is None:
+        raise NotFoundError("成员不存在")
+
+    # Prevent self-deletion
+    if current_user_id is not None and str(tm.user_id) == current_user_id:
+        raise ForbiddenError("不能删除自己的账号")
+
+    # Prevent deleting the last admin
+    if tm.role == "admin":
+        admin_count = await _count_admins(db, tid)
+        if admin_count <= 1:
+            raise ConflictError("团队必须至少保留一名管理员")
+
+    await db.execute(
         delete(TeamMember).where(TeamMember.id == mid, TeamMember.team_id == tid)
     )
-    if result.rowcount == 0:  # type: ignore[attr-defined]
-        raise NotFoundError("成员不存在")

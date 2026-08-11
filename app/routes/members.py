@@ -105,5 +105,10 @@ async def delete_member(
     db: AsyncSession = Depends(get_db),
 ) -> SuccessResponse:
     """Delete a member (admin only)."""
-    await member_service.delete_member(db, current.team_id, member_id)
+    await member_service.delete_member(
+        db,
+        current.team_id,
+        member_id,
+        current_user_id=str(current.user.id),
+    )
     return SuccessResponse(message="删除成功")

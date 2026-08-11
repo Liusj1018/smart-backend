@@ -73,7 +73,12 @@ async def test_write_ignores_x_user_role_header(client: AsyncClient) -> None:
     """X-User-Role header must not grant admin — role comes from JWT/DB."""
     # Bob is a developer; forging X-User-Role: admin must not elevate privileges.
     headers = {**DEV_HEADERS, "X-User-Role": "admin"}
-    payload = {"name": "X", "email": "x@example.com", "role": "developer"}
+    payload = {
+        "name": "X",
+        "email": "x@example.com",
+        "password": "SecurePass123",
+        "role": "developer",
+    }
     r = await client.post(API, json=payload, headers=headers)
     assert r.status_code == 403
 
@@ -161,7 +166,12 @@ async def test_get_member_other_team_not_found(client: AsyncClient) -> None:
 # ---------- create ----------
 
 async def test_create_member_admin(client: AsyncClient) -> None:
-    payload = {"name": "New Dev", "email": "new@example.com", "role": "developer"}
+    payload = {
+        "name": "New Dev",
+        "email": "new@example.com",
+        "password": "SecurePass123",
+        "role": "developer",
+    }
     r = await client.post(API, json=payload, headers=ADMIN_HEADERS)
     assert r.status_code == 201
     body = r.json()
@@ -170,26 +180,46 @@ async def test_create_member_admin(client: AsyncClient) -> None:
 
 
 async def test_create_member_forbidden_for_viewer(client: AsyncClient) -> None:
-    payload = {"name": "X", "email": "x@example.com", "role": "developer"}
+    payload = {
+        "name": "X",
+        "email": "x@example.com",
+        "password": "SecurePass123",
+        "role": "developer",
+    }
     r = await client.post(API, json=payload, headers=VIEWER_HEADERS)
     assert r.status_code == 403
     assert r.json()["title"] == "Forbidden"
 
 
 async def test_create_member_forbidden_for_developer(client: AsyncClient) -> None:
-    payload = {"name": "X", "email": "x@example.com", "role": "developer"}
+    payload = {
+        "name": "X",
+        "email": "x@example.com",
+        "password": "SecurePass123",
+        "role": "developer",
+    }
     r = await client.post(API, json=payload, headers=DEV_HEADERS)
     assert r.status_code == 403
 
 
 async def test_create_member_invalid_role(client: AsyncClient) -> None:
-    payload = {"name": "X", "email": "x@example.com", "role": "superadmin"}
+    payload = {
+        "name": "X",
+        "email": "x@example.com",
+        "password": "SecurePass123",
+        "role": "superadmin",
+    }
     r = await client.post(API, json=payload, headers=ADMIN_HEADERS)
     assert r.status_code == 422
 
 
 async def test_create_member_invalid_email(client: AsyncClient) -> None:
-    payload = {"name": "X", "email": "not-an-email", "role": "developer"}
+    payload = {
+        "name": "X",
+        "email": "not-an-email",
+        "password": "SecurePass123",
+        "role": "developer",
+    }
     r = await client.post(API, json=payload, headers=ADMIN_HEADERS)
     assert r.status_code == 422
 
@@ -282,3 +312,79 @@ async def test_delete_member_not_found(client: AsyncClient) -> None:
         f"{API}/00000000-0000-0000-0000-000000000000", headers=ADMIN_HEADERS
     )
     assert r.status_code == 404
+
+
+async def test_delete_self_forbidden(client: AsyncClient) -> None:
+    """An admin must not be able to delete their own account."""
+    members = (await client.get(API, headers=ADMIN_HEADERS)).json()["items"]
+    # Alice is the admin (first member in seed data, USER_ALICE)
+    alice = next(m for m in members if m["name"] == "Alice Admin")
+    r = await client.delete(f"{API}/{alice['id']}", headers=ADMIN_HEADERS)
+    assert r.status_code == 403
+    body = r.json()
+    assert body["title"] == "Forbidden"
+    assert "自己" in body["detail"]
+
+
+async def test_delete_last_admin_conflict(client: AsyncClient) -> None:
+    """Deleting the only admin must return 409 Conflict."""
+    # Create a second admin, delete the original admin, then try to delete
+    # the second admin (now the last one).
+    payload = {
+        "name": "Second Admin",
+        "email": "second-admin@example.com",
+        "password": "AdminPass123",
+        "role": "admin",
+    }
+    created = (await client.post(API, json=payload, headers=ADMIN_HEADERS)).json()
+
+    # Delete Alice (the original admin) — should succeed since there are 2 admins
+    members = (await client.get(API, headers=ADMIN_HEADERS)).json()["items"]
+    alice = next(m for m in members if m["name"] == "Alice Admin")
+    r = await client.delete(f"{API}/{alice['id']}", headers=ADMIN_HEADERS)
+    assert r.status_code == 200
+
+    # Now the second admin is the last admin. Try to delete them.
+    r = await client.delete(f"{API}/{created['id']}", headers=ADMIN_HEADERS)
+    assert r.status_code == 409
+    body = r.json()
+    assert body["title"] == "Conflict"
+    assert "管理员" in body["detail"]
+
+
+async def test_demote_last_admin_conflict(client: AsyncClient) -> None:
+    """Demoting the only admin to a non-admin role must return 409."""
+    members = (await client.get(API, headers=ADMIN_HEADERS)).json()["items"]
+    alice = next(m for m in members if m["name"] == "Alice Admin")
+    r = await client.put(
+        f"{API}/{alice['id']}",
+        json={"role": "developer"},
+        headers=ADMIN_HEADERS,
+    )
+    assert r.status_code == 409
+    body = r.json()
+    assert body["title"] == "Conflict"
+    assert "管理员" in body["detail"]
+
+
+async def test_demote_admin_when_other_admin_exists(client: AsyncClient) -> None:
+    """Demoting an admin should succeed when another admin exists."""
+    # Create a second admin
+    payload = {
+        "name": "Second Admin",
+        "email": "second-admin2@example.com",
+        "password": "AdminPass123",
+        "role": "admin",
+    }
+    await client.post(API, json=payload, headers=ADMIN_HEADERS)
+
+    # Demote Alice to developer — should succeed
+    members = (await client.get(API, headers=ADMIN_HEADERS)).json()["items"]
+    alice = next(m for m in members if m["name"] == "Alice Admin")
+    r = await client.put(
+        f"{API}/{alice['id']}",
+        json={"role": "developer"},
+        headers=ADMIN_HEADERS,
+    )
+    assert r.status_code == 200
+    assert r.json()["role"] == "developer"

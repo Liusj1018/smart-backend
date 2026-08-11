@@ -30,6 +30,7 @@ htmlcov/
 
 # Node (for openapi-typescript)
 node_modules/
+.next/
 
 # OS
 Thumbs.db
@@ -38,3 +39,5 @@ Thumbs.db
 # Logs
 logs*.json
 *.log
+.vercel
+.env*
