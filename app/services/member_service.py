@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.security import hash_password
 from app.db.models.team_member import TeamMember
 from app.db.models.user import User
 from app.exceptions import (
@@ -95,6 +96,7 @@ async def create_member(
     team_id: str,
     name: str,
     email: str,
+    password: str,
     role: Role,
     github_username: str | None = None,
 ) -> Member:
@@ -109,7 +111,7 @@ async def create_member(
     user = User(
         name=name,
         email=email,
-        password_hash="!",
+        password_hash=hash_password(password),
         github_username=github_username,
     )
     db.add(user)

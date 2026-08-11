@@ -17,6 +17,7 @@ class MemberCreate(BaseModel):
             "example": {
                 "name": "张三",
                 "email": "zhangsan@example.com",
+                "password": "SecurePass123!",
                 "role": "developer",
                 "github_username": "zhangsan",
             }
@@ -25,6 +26,7 @@ class MemberCreate(BaseModel):
 
     name: Annotated[str, Field(min_length=1, max_length=100, description="Display name")]
     email: Annotated[EmailStr, Field(description="Email address")]
+    password: Annotated[str, Field(min_length=6, max_length=128, description="Login password (min 6 chars)")]
     role: Annotated[Role, Field(description="Team role")]
     github_username: Annotated[str | None, Field(default=None, max_length=100, description="GitHub handle")] = None
 

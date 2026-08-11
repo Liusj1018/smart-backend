@@ -71,6 +71,7 @@ async def create_member(
         team_id=current.team_id,
         name=payload.name,
         email=payload.email,
+        password=payload.password,
         role=payload.role,
         github_username=payload.github_username,
     )
